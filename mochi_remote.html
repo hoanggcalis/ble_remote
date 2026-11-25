@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mochi Zero v2.3 Remote</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --border: #30363d;
+      --accent: #38bdf8;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --ok: #22c55e;
+      --stealth: #a855f7;
+      --text: #e6edf3;
+      --muted: #8b949e;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    body {
+      margin: 0; padding: 14px; font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text); max-width: 440px; margin-inline: auto;
+    }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .title { font-size: 18px; font-weight: 700; letter-spacing: 0.4px; }
+    .badge {
+      font-size: 11px; padding: 4px 9px; border-radius: 999px; font-weight: 700;
+      background: #21262d; color: var(--muted); border: 1px solid var(--border);
+    }
+    .badge.ok { color: var(--ok); border-color: var(--ok); }
+    .badge.eco { color: var(--warn); border-color: var(--warn); }
+
+    .screen-box {
+      background: #000; border: 2px solid var(--border); border-radius: 12px;
+      padding: 8px; margin-bottom: 10px; position: relative;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .screen-box.stealth-on {
+      border-color: var(--stealth);
+      box-shadow: 0 0 14px rgba(168, 85, 247, 0.28);
+    }
+    canvas {
+      width: 100%; aspect-ratio: 2 / 1; display: block;
+      image-rendering: pixelated; background: #000; border-radius: 6px;
+    }
+
+    .status-bar {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+      font-size: 12px; color: var(--muted);
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 8px 12px; margin-bottom: 10px;
+    }
+    .status-right { text-align: right; }
+
+    .btn {
+      width: 100%; border: 1px solid var(--border); background: var(--card); color: var(--text);
+      padding: 13px 10px; border-radius: 12px; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: transform 0.06s, background 0.15s, border-color 0.15s;
+    }
+    .btn:active { transform: scale(0.96); background: #262c36; }
+    .btn:disabled { opacity: 0.4; pointer-events: none; }
+    .btn-primary { background: #0284c7; border-color: #0ea5e9; color: #fff; }
+    .btn-warn { background: #b45309; border-color: var(--warn); color: #fff; }
+    .btn-danger { background: #b91c1c; border-color: var(--danger); color: #fff; font-size: 15px; }
+    .btn-stealth-on { background: #581c87; border-color: var(--stealth); color: #f3e8ff; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+
+    .panel {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px; margin-top: 10px;
+    }
+    .panel-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    select {
+      background: #0d1117; color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 10px; font-size: 13px; font-weight: 600;
+    }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">MOCHI ZERO v2.3</div>
+    <div id="tierBadge" class="badge">CHƯA KẾT NỐI</div>
+  </div>
+
+  <div id="screenBox" class="screen-box">
+    <canvas id="oled" width="128" height="64"></canvas>
+  </div>
+
+  <div class="status-bar">
+    <div>Chế độ: <strong id="modeText" style="color:var(--text)">--</strong></div>
+    <div class="status-right">Hẹn giờ: <strong id="remText" style="color:var(--accent)">--</strong></div>
+    <div>RAM trống: <strong id="heapText" style="color:var(--ok)">--</strong></div>
+    <div class="status-right">Stealth Mode: <strong id="stealthText" style="color:var(--muted)">TẮT</strong></div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:10px;">
+    <button id="btnConnect" class="btn btn-primary">KẾT NỐI BLE</button>
+    <button id="btnStealth" class="btn" disabled>Stealth Mode: TẮT</button>
+  </div>
+
+  <!-- Cụm điều khiển đồng bộ cả 3 Slot -->
+  <div id="controls">
+    <div class="grid-3">
+      <button class="btn ctrl" data-cmd="1">Chuyển</button>
+      <button class="btn ctrl" data-cmd="2">2 Chạm</button>
+      <button class="btn ctrl" data-cmd="3">Lùi (Lùi)</button>
+    </div>
+
+    <div class="grid-2">
+      <button class="btn ctrl btn-warn" data-cmd="4">Giữ Chọn (0.55s)</button>
+      <button class="btn ctrl" data-cmd="6">Menu Ẩn</button>
+    </div>
+
+    <div class="grid-2">
+      <button class="btn ctrl" data-cmd="5">Cài Đặt / Chọn</button>
+      <button class="btn ctrl" data-cmd="17">Làm Tươi Khung Hình</button>
+    </div>
+
+    <button class="btn ctrl btn-danger" data-cmd="16">Về Mochi &amp; Thoát menu ẩn</button>
+  </div>
+
+  <!-- Khối cài đặt 2 Chốt An Toàn -->
+  <div class="panel">
+    <div class="panel-row">
+      <div>
+        <div style="font-size:13px;font-weight:700;">Chốt 2: Hẹn giờ tự ngắt Slot</div>
+        <div style="font-size:11px;color:var(--muted);">Hết giờ tự động quay về mặt Mochi</div>
+      </div>
+      <select id="autoStopSel" disabled>
+        <option value="0">Tắt</option>
+        <option value="15">15 giây</option>
+        <option value="30">30 giây</option>
+        <option value="60" selected>60 giây</option>
+        <option value="120">2 phút</option>
+        <option value="180">3 phút</option>
+      </select>
+    </div>
+    <div class="hint">
+      • <strong>Chế độ Stealth Mode:</strong> Ngắt OLED ngoài, khóa LED GPIO 8 &amp; cảm ứng chạm; chỉ điều khiển qua Web hoặc rút nguồn Reset.<br/>
+      • <strong>Chốt 1 (10s):</strong> Mất kết nối BLE quá 10s ở Menu Ẩn / Slot sẽ tự về Mochi ngầm (vẫn giữ tắt màn nếu đang Stealth Mode).
+    </div>
+  </div>
+
+  <script>
+    const SVC_UUID    = '4d4f4348-4900-4000-8000-000000000001';
+    const SCREEN_UUID = '4d4f4348-4900-4000-8000-000000000002';
+    const CMD_UUID    = '4d4f4348-4900-4000-8000-000000000003';
+    const STATUS_UUID = '4d4f4348-4900-4000-8000-000000000004';
+
+    const MODE_NAMES = ['Dasai Mochi', 'Slot 1 (BLE)', 'Slot 2 (WiFi)', 'Slot 3 (IR)', 'Cài Đặt', 'Menu Ẩn'];
+
+    const canvas = document.getElementById('oled');
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(128, 64);
+    const fb = new Uint8Array(1024);
+
+    let device = null, cmdChar = null, invertDisplay = false, stealthActive = false;
+    let writeQueue = Promise.resolve();
+
+    const btnConnect = document.getElementById('btnConnect');
+    const btnStealth = document.getElementById('btnStealth');
+    const screenBox = document.getElementById('screenBox');
+    const tierBadge = document.getElementById('tierBadge');
+    const modeText = document.getElementById('modeText');
+    const remText = document.getElementById('remText');
+    const heapText = document.getElementById('heapText');
+    const stealthText = document.getElementById('stealthText');
+    const autoStopSel = document.getElementById('autoStopSel');
+    const ctrlBtns = document.querySelectorAll('.ctrl');
+
+    function updateStealthUI(isStealth) {
+      stealthActive = isStealth;
+      if (isStealth) {
+        btnStealth.textContent = 'Stealth Mode: BẬT';
+        btnStealth.className = 'btn btn-stealth-on';
+        screenBox.classList.add('stealth-on');
+        stealthText.textContent = 'ĐANG BẬT';
+        stealthText.style.color = 'var(--stealth)';
+      } else {
+        btnStealth.textContent = 'Stealth Mode: TẮT';
+        btnStealth.className = 'btn';
+        screenBox.classList.remove('stealth-on');
+        stealthText.textContent = 'TẮT';
+        stealthText.style.color = 'var(--muted)';
+      }
+    }
+
+    function setConnectedUI(isConn) {
+      ctrlBtns.forEach(b => b.disabled = !isConn);
+      autoStopSel.disabled = !isConn;
+      btnStealth.disabled = !isConn;
+      if (!isConn) {
+        btnConnect.textContent = 'KẾT NỐI BLE';
+        btnConnect.className = 'btn btn-primary';
+        tierBadge.textContent = 'ĐÃ NGẮT KẾT NỐI';
+        tierBadge.className = 'badge';
+        modeText.textContent = '--';
+        remText.textContent = '--';
+        heapText.textContent = '--';
+        updateStealthUI(false);
+      } else {
+        btnConnect.textContent = 'NGẮT KẾT NỐI';
+        btnConnect.className = 'btn';
+      }
+    }
+
+    function renderOLED() {
+      const d = imgData.data;
+      for (let p = 0; p < 8; p++) {
+        const pageOff = p * 128;
+        for (let x = 0; x < 128; x++) {
+          const byteVal = fb[pageOff + x];
+          for (let b = 0; b < 8; b++) {
+            const y = (p << 3) + b;
+            let on = ((byteVal >> b) & 1) !== 0;
+            if (invertDisplay) on = !on;
+            const idx = (y * 128 + x) * 4;
+            d[idx]     = on ? 220 : 8;
+            d[idx + 1] = on ? 245 : 12;
+            d[idx + 2] = on ? 255 : 18;
+            d[idx + 3] = 255;
+          }
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    function onScreenPacket(ev) {
+      const dv = ev.target.value;
+      if (dv.byteLength < 2) return;
+      const hdr = dv.getUint8(0);
+      const flush = (hdr & 0x80) !== 0;
+      const offset = (hdr & 0x3F) << 4;
+      const len = dv.byteLength - 1;
+      for (let i = 0; i < len && (offset + i) < 1024; i++) {
+        fb[offset + i] = dv.getUint8(1 + i);
+      }
+      if (flush) renderOLED();
+    }
+
+    function onStatusPacket(ev) {
+      const dv = ev.target.value;
+      if (dv.byteLength < 6) return;
+      const mode = dv.getUint8(0);
+      const tier = dv.getUint8(1);
+      const sleeping = dv.getUint8(2) !== 0;
+      const autoSec = dv.getUint8(3);
+      const remSec = dv.getUint8(4);
+      const flags = dv.getUint8(5);
+      const newInv = (flags & 0x01) !== 0;
+      const newStealth = (flags & 0x02) !== 0;
+
+      if (newInv !== invertDisplay) {
+        invertDisplay = newInv;
+        renderOLED();
+      }
+
+      if (newStealth !== stealthActive) {
+        updateStealthUI(newStealth);
+      }
+
+      modeText.textContent = (MODE_NAMES[mode] || ('Mode ' + mode)) + (sleeping ? ' (Ngủ)' : '');
+      remText.textContent = remSec > 0 ? (remSec + 's') : (autoSec > 0 ? (autoSec + 's sẵn sàng') : 'Tắt');
+
+      if (dv.byteLength >= 8) {
+        const freeKb = dv.getUint8(6);
+        const minKb = dv.getUint8(7);
+        heapText.textContent = freeKb + 'KB (Min ' + minKb + 'KB)';
+        heapText.style.color = minKb < 35 ? 'var(--danger)' : (minKb < 60 ? 'var(--warn)' : 'var(--ok)');
+      }
+
+      if (autoStopSel.value !== String(autoSec) && [...autoStopSel.options].some(o => o.value === String(autoSec))) {
+        autoStopSel.value = String(autoSec);
+      }
+
+      if (tier === 2) {
+        tierBadge.textContent = 'FULL MIRROR · 3 FPS';
+        tierBadge.className = 'badge eco';
+      } else {
+        tierBadge.textContent = 'FULL MIRROR · 10 FPS';
+        tierBadge.className = 'badge ok';
+      }
+    }
+
+    function sendBytes(arr) {
+      if (!cmdChar) return;
+      const buf = new Uint8Array(arr);
+      writeQueue = writeQueue.then(async () => {
+        try {
+          if (cmdChar.writeValueWithoutResponse) {
+            await cmdChar.writeValueWithoutResponse(buf);
+          } else {
+            await cmdChar.writeValue(buf);
+          }
+        } catch (e) {
+          console.warn('Write err:', e);
+        }
+      });
+    }
+
+    ctrlBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (navigator.vibrate) navigator.vibrate(20);
+        sendBytes([Number(btn.dataset.cmd)]);
+      });
+    });
+
+    btnStealth.addEventListener('click', () => {
+      if (navigator.vibrate) navigator.vibrate(35);
+      const nextState = !stealthActive;
+      updateStealthUI(nextState);
+      sendBytes([0x30, nextState ? 1 : 0]);
+    });
+
+    autoStopSel.addEventListener('change', () => {
+      sendBytes([0x20, Number(autoStopSel.value)]);
+    });
+
+    btnConnect.addEventListener('click', async () => {
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+        return;
+      }
+      try {
+        btnConnect.textContent = 'ĐANG QUÉT...';
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'Mochi Remote' }, { services: [SVC_UUID] }],
+          optionalServices: [SVC_UUID]
+        });
+        device.addEventListener('gattserverdisconnected', () => {
+          cmdChar = null;
+          setConnectedUI(false);
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SVC_UUID);
+
+        const screenChar = await service.getCharacteristic(SCREEN_UUID);
+        cmdChar = await service.getCharacteristic(CMD_UUID);
+        const statusChar = await service.getCharacteristic(STATUS_UUID);
+
+        await screenChar.startNotifications();
+        screenChar.addEventListener('characteristicvaluechanged', onScreenPacket);
+
+        await statusChar.startNotifications();
+        statusChar.addEventListener('characteristicvaluechanged', onStatusPacket);
+
+        setConnectedUI(true);
+        sendBytes([0x11]);
+      } catch (err) {
+        console.error(err);
+        setConnectedUI(false);
+        alert('Không thể kết nối: ' + err.message);
+      }
+    });
+
+    setConnectedUI(false);
+    renderOLED();
+  </script>
+</body>
+</html>
